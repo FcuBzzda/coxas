@@ -1,0 +1,14 @@
+def generar_estructura(names,goals,goals_avoided,assists,diccionario):
+    name_list= names.split(", ")
+    estadisticas=[]
+    for player in range(len(name_list)):
+        estadisticas=[goals[player],goals_avoided[player],assists[player]]
+        diccionario[name_list[player]]=estadisticas;
+names="""erik, piola"""
+goals=[10,25]
+goals_avoided=[6,5]
+assists=[12,1]
+lista_prueba={}
+generar_estructura(names,goals,goals_avoided,assists,lista_prueba)
+print("EStadisticas de Agustin: ")
+print("Goles: ",lista_prueba["agustin"][0],". Goals avoided: ",lista_prueba["agustin"][1],". Asistencias: ",lista_prueba["agustin"][2])
