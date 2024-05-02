@@ -1,0 +1,14 @@
+with open(file_path, 'r',encoding='utf8')as Archivo_Lectura:
+    with open(file_path, 'w',encoding='utf8')as Archivo_Escritura:
+         found = False
+         csv_reader = csv.reader(Archivo_Lectura)
+         csv_writer = csv.writer(Archivo_Escritura)
+         header = next(csv_reader)
+         csv_writer.writerow(header)
+         for line in csv_reader:
+              if line[3] == mail:
+                   found = True
+                   newLine = [user_Name,full_Name,date_of_birth,gender]
+                   csv_writer.writerow(newLine)
+                   break
+              csv_writer.writerow(line)
