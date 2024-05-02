@@ -10,5 +10,6 @@ with open(file_path, 'r',encoding='utf8')as Archivo_Lectura:
                    found = True
                    newLine = [user_Name,full_Name,date_of_birth,gender]
                    csv_writer.writerow(newLine)
+                   st.write('Usuario registrado.')
                    break
               csv_writer.writerow(line)
