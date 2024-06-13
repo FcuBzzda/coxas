@@ -1,0 +1,265 @@
+import pandas as pd
+import random
+from pathlib import Path
+import streamlit as st
+import time
+import datetime as dt
+import csv
+
+game_path = Path('./Page/pages/Games.csv')
+User_Path = Path('./Page/pages/Users.csv')
+
+airport_Path = Path('./DataSets/datasetsModificados/ar-airports.csv')
+Lakes_Path = Path('./DataSets/datasetsModificados/lagos_arg.csv')
+connection_Path = Path('./DataSets/datasetsModificados/Conectividad_Internet.csv')
+censo_Path = Path('./DataSets/datasetsModificados/c2022_tp_c_resumen_adaptado.csv')
+
+def calculate_score(score,difficulty):
+
+    """this function calculate and return the right score for each difficulty
+        receive two parametrers:
+        score : the score of the user, depens que cant of correct answers
+        difficulty : the difficulty that determinate the score
+        Facil = no plus points
+        Normal = 0.5 plus point per correct answer
+        Dificil = 1 plus pont per correct answer"""
+    
+     # check if the user answer is correct, and it if correct sum 1 to the score
+    for i, question in enumerate(st.session_state.game['questions']):
+        if question['respuesta_usuario'] == question['respuesta correcta']: # como hacer para comparar ambas en lower, y como comparar si el dato es un numero
+            score += 1    
+            st.session_state.game['user_correct'] += 1
+    # calculate with the difficulty
+    match difficulty:
+        case 'Facil':
+            return score
+        case 'Normal':
+            return score * 1.5
+        case 'Dificil':
+            return score * 2
+
+def add_game(game):
+    st.session_state.game['score'] = calculate_score(game['score'],game['difficulty'])
+    with open(game_path, 'a', encoding='utf-8',newline="") as game_file:
+        csv_writer = csv.writer(game_file, delimiter=',')
+        if game_file.tell() == 0:
+            header =['User','Theme','Difficulty','Score','Date']
+            csv_writer.writerow(header)
+        csv_writer.writerow([game['user'],game['theme'],game['difficulty'],game['score'],game['date']])
+
+
+def set_data(theme):
+
+    """this function find the correct dataset and return a dataframe whit the colums to use in the questions
+        receive the parametrer theme whit the name of the dataset to use"""
+    
+    if(theme == "Aereopuertos"):
+        df_airport = pd.read_csv(airport_Path)
+        return df_airport[['name','type','prov_name','elevation_name']]
+    elif(theme == "Lagos"):
+        df_lakes = pd.read_csv(Lakes_Path)
+        return df_lakes[['Nombre','Ubicación','Sup Tamaño','Superficie (km²)']]
+    elif(theme == "Conectividad"):
+        df_connection = pd.read_csv(connection_Path)
+        return df_connection[['Provincia','Partido','Localidad','posee_conectividad']]
+    else:                                                             
+        df_censo = pd.read_csv(censo_Path)
+        return df_censo[['Jurisdicción','Total de población','Población en situación de calle(²)','Población en viviendas particulares']]
+
+def add_difficulty(difficulty,question,df_theme,num):
+
+    """this funtion show the question and the clues depents the difficulty
+        Facil = show 5 options where one is correct
+        Normal = if is a number show the count of digits and a rang where is the number,
+                 if is a word show the first letter
+        Dificil = it has no clues
+        Receive five parametrers:
+                difficulty: Facil / Normal / Dificl
+                question: the question to show
+                right_answer: add the righ answer to more_options in the Facil one
+                df_theme: Datafreme to obtain more answers options in the Facil one
+                j: number of the question"""
+    
+    #print(type(question['opciones']))
+    if difficulty == 'Facil':
+        user_answer = st.radio('Seleccionel la opcion correcta',question['opciones'],index=None, key= num)
+        st.write(user_answer)
+    elif difficulty == 'Normal':
+        try:
+            # if is a word show the firs letter
+            st.write(f'AYUDA: La respuesta empieza por {question["respuesta correcta"][0]}')
+        except IndexError:
+            # if is a number show the cant of diggits
+            st.write(f'AYUDA: es un numero de {len(str(question["respuesta correcta"]))} digitos entre {question["respuesta correcta"] - 200 if question["respuesta correcta"] > 200 else 0} y {question["respuesta correcta"] + 200}')
+        user_answer = st.text_input(f"Ingrese la respuesta",key=num)
+
+    else:
+        user_answer = st.text_input(f"Ingrese la respuesta", key=num)
+
+    return user_answer
+
+def more_options(question,answer,df_theme):
+    # take more options of the atributte to put in the radio button
+    more_options = df_theme[question].sample(4).unique().tolist()
+    if answer not in more_options:
+        more_options.append(answer)
+    return more_options
+
+def create_questions(theme):
+
+    df_theme = set_data(theme)
+
+    indice_aleatorio = random.randint(0, len(df_theme) - 1)   
+    random_row = df_theme.iloc[indice_aleatorio]
+    ocultar = random.randint(0,3)
+    mostrar = []
+    pregunta = ""
+    respuesta = ""
+    opciones = []
+
+    for i in range(len(random_row)):
+        if i != ocultar:
+            mostrar.append(f"{random_row.index[i]} : {random_row.iloc[i]}")
+        else:
+            respuesta = random_row.iloc[i]
+            pregunta = random_row.index[i]
+            mostrar.append(f"{pregunta} : Desconocido")
+    if st.session_state.game['difficulty'] == "Facil":
+        opciones = more_options(pregunta,respuesta,df_theme)
+    return mostrar,pregunta,respuesta,opciones
+
+def start_game(user,difficulty,df_theme):
+ 
+    """this function create the new game an run it
+        receive trhee parametrers:
+        user: the name of the user who is gonna plat
+        theme: the theme of the questions of the game(aerepuertos,lagos,conectividad,censo)
+        difficulty: the difficulty of the game (facil,normal,dificil)"""
+
+    if st.session_state.game['state'] == 'creado':
+    # call the function set_data to get the dataframe to use
+
+        st.title('Empezemos con la PyTrivia')
+        st.write('Responda todas las preguntas y consigue puntos por cada respuesta correcta')
+        st.write(f'Dificultad: {difficulty}')
+        st.write(f'Usuario: {user}')
+        with st.form(f"Preguntas",clear_on_submit=False):
+            
+            # muestras las preguntas previamente creadas
+            for i, dicc in enumerate(st.session_state.game["questions"]):
+                st.title(f'Pregunta {i+1}')
+                for columna in dicc.get("mostrar", []):
+                    st.write(columna)
+                # guarda la respuesta del usuario
+
+
+                #user_answer = st.text_input("Ingrese su respuesta:",key=i)
+                dicc["respuesta_usuario"] = add_difficulty(difficulty,st.session_state.game['questions'][i],df_theme,i)
+                
+
+            submitted = st.form_submit_button("Enviar Respuesta")
+            if submitted:
+                st.session_state.game['state'] = 'terminado'
+                st.session_state.game['date'] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                add_game(st.session_state.game) # porque lo agrega multiples veces cuando apreto un boton, porque se agrega sin puntos la primera vez
+                st.rerun()
+        
+# Trying to access to the csv file and read a certain column, 
+# but if this doesnt exist, it gives error so this is a solution
+
+if 'game' not in st.session_state:
+    st.session_state['game'] ={
+        "state" : 'no_creado',
+        "user"  : None,
+        'difficulty' : None,
+        'theme' : None,
+        "score" : 0,
+        "questions_state" : False,
+        "questions" : [],
+        "user_answers" : [""] * 5,
+        "user_correct" : 0,
+        'date' : ""
+    }
+
+# if no button is submitted this is true
+if st.session_state.game["state"] == 'no_creado':
+
+    st.title("¡Bienvenido!")
+
+    try:
+        df_users = pd.read_csv(User_Path)
+        options = [f"{row['user_name']}({row['mail']})" for index, row in df_users.iterrows()]
+        options.append('Crear nuevo usuario')
+    except:
+        options = ['Crear nuevo usuario']
+
+
+    print(options)
+
+    User = st.selectbox('¿Quien jugará ahora?',options,index=None,placeholder=str('Usuario'))
+
+    theme = st.selectbox('Elije una tematica',['Aereopuertos','Lagos','Conectividad','Censo 2022'],index=None,placeholder='Tematica')
+
+    difficulty = st.selectbox('Elije una dificultad',['Facil','Normal','Dificil'],index=None,placeholder='Dificultad')
+
+    # Función para seleccionar preguntas según la dificultad
+
+    # Match structure, if no user chose, the buttom 'Jugar' is disabled, when you chose to create a new user, you will be
+    # redirected to the form page
+    match User:
+        case 'Crear nuevo usuario':
+            st.switch_page('./pages/03_Formulario_de_registro.py')
+        case None:
+            st.button('Jugar',disabled=True)
+        case _:
+            if theme == None or difficulty == None or st.session_state.game['state'] != 'no_creado': #porque puedo seguir apretando el boton de jugar una ves empeze la trivia
+                st.button('Jugar',disabled=True)
+            else:
+                if st.button('Jugar'):                      # porque si le doy dos veces seguidas me borra el formulario
+                    st.session_state.game['state'] = 'generate questions'
+                    st.session_state.game['user'] = User
+                    st.session_state.game['difficulty'] = difficulty
+                    st.session_state.game['theme'] = theme
+
+if st.session_state.game['state'] == 'generate questions':
+    for i in range(5):
+        mostrar, pregunta, respuesta, options = create_questions(st.session_state.game['theme'])
+        st.session_state.game['questions'].append({
+            "mostrar": mostrar,
+            "pregunta": pregunta,
+            "respuesta correcta": respuesta,
+            "opciones": options
+            })
+    st.session_state.game['state'] = "creado"
+    st.rerun()
+
+# if the Jugar button is submitted this is true
+if st.session_state.game['state'] == 'creado':
+    #for i,pregunta in enumerate(st.session_state.game['questions']):
+        #st.write(pregunta)
+    df_theme = set_data(st.session_state.game["theme"])
+    start_game(st.session_state.game['user'],st.session_state.game['difficulty'],df_theme)
+
+# if the button Enviar Respuestas in star_game is submitted this is true
+elif st.session_state.game['state'] == 'terminado':
+    st.subheader('Felicidades has terminado tu partida')
+    st.write('Apreta el boton volver a jugar para inciar una nueva apartida')
+    # button to restart the game, restar all the fields of the session state
+    st.write(st.session_state.game['questions'])
+    if st.button('Volver a jugar'):
+        st.session_state['game'] ={
+            "state" : 'no_creado',
+            "user"  : None,
+            "difficulty" : None,
+            "theme" : None,
+            "score" : 0,
+            "questions_state" : False,
+            "questions" : [],
+            "user_answers" : [""] * 5, # no guarda las respuestas correctas de la modalidad facil
+            "user_correct" : 0,
+            'date' : ""
+            }
+        st.rerun()
+    st.write('Apreta el boton de ver partida o dirigete a la pagina de Ranking para ver el resultado de tu partida')
+    if st.button('Ver partida'):
+        st.switch_page('pages/04_Ranking.py')
