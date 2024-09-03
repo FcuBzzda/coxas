@@ -1,0 +1,33 @@
+String getText(){
+        return text;
+	}
+
+	void setText(String text){
+        this.text = text;
+	}
+
+	int getLikes(){
+        return Likes;
+	}
+
+
+	void like(){
+        this.Likes++;
+	}
+
+
+	void dislike();{
+        if(this.Likes > 0){
+            this.Likes -= 1;
+        }
+	}
+
+
+	boolean isFeatured(){
+        return this.Featured;
+	}
+
+
+	void toggleFeatured(){
+        this.Featured = !this.Featured;
+	}
